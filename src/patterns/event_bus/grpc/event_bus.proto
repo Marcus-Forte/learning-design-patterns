@@ -1,0 +1,38 @@
+syntax = "proto3";
+import "google/protobuf/empty.proto";
+import "google/protobuf/wrappers.proto";
+
+package eb;
+
+// Basic Event Bus service definitions.
+
+enum EventType {
+    EVENT_A = 0;
+    EVENT_B = 1;
+    EVENT_C = 2;
+}
+
+message Message {
+    string content = 1;
+}
+
+message PublishRequest {
+    EventType event = 1;
+    Message message = 2;
+}
+
+message SubscribeRequest {
+     EventType event = 1;
+}
+
+message NumberOfSubscribersResponse {
+    int32 count = 1;
+}
+
+
+service EventBus {
+    rpc Publish (PublishRequest) returns (google.protobuf.Empty);
+    rpc Subscribe (SubscribeRequest) returns (stream Message);
+
+    rpc getNumberOfSubscribers (google.protobuf.Empty) returns (NumberOfSubscribersResponse);
+}

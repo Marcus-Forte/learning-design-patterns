@@ -1,0 +1,30 @@
+# Event Bus
+
+add_library(event_bus_lib INTERFACE)
+target_include_directories(event_bus_lib INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(event_bus
+    main.cc)
+target_link_libraries(event_bus
+    event_bus_lib)
+
+
+# gRPC Event Bus
+generate_proto(${CMAKE_CURRENT_SOURCE_DIR}/grpc/event_bus.proto)
+
+add_library(event_bus_grpc STATIC
+${CMAKE_CURRENT_BINARY_DIR}/event_bus.pb.cc
+${CMAKE_CURRENT_BINARY_DIR}/event_bus.grpc.pb.cc
+)
+
+add_executable(event_bus_server
+    grpc/event_bus_service.cc
+    grpc/server.cc)
+
+add_executable(event_bus_client
+    grpc/client.cc)
+
+target_link_libraries(event_bus_grpc ${_PROTOBUF_LIBPROTOBUF} ${_GRPC_GRPCPP})
+target_link_libraries(event_bus_server event_bus_grpc event_bus_lib)
+target_link_libraries(event_bus_client event_bus_grpc)
