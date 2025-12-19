@@ -1,5 +1,6 @@
 #include "event_bus.grpc.pb.h"
 
+#include <google/protobuf/empty.pb.h>
 #include <grpcpp/grpcpp.h>
 
 #include <iostream>
@@ -39,20 +40,54 @@ static int subscribe(eb::EventBus::Stub &stub, const std::string &event) {
   return 0;
 }
 
-int main(int argc, char **argv) {
-  if (argc != 2) {
-    std::cerr << "Usage: " << argv[0] << " <A|B|C>\n";
+static int publish(eb::EventBus::Stub &stub, const std::string &event,
+                   const std::string &content) {
+  eb::PublishRequest req;
+  req.set_event(parse_event(event));
+  req.mutable_message()->set_content(content);
+
+  grpc::ClientContext ctx;
+  google::protobuf::Empty empty;
+
+  auto status = stub.Publish(&ctx, req, &empty);
+  if (!status.ok()) {
+    std::cerr << "Publish failed: " << status.error_message() << "\n";
     return 1;
   }
 
-  const std::string event = argv[1];
+  std::cout << "Published to event " << event << ": " << content << "\n";
+  return 0;
+}
+
+int main(int argc, char **argv) {
+  if (argc < 3) {
+    std::cerr << "Usage: " << argv[0]
+              << " <publish|subscribe> <A|B|C> [message]\n";
+    return 1;
+  }
+
+  const std::string mode = argv[1];
+  const std::string event = argv[2];
 
   auto channel = grpc::CreateChannel("localhost:50051",
                                      grpc::InsecureChannelCredentials());
   auto stub = eb::EventBus::NewStub(channel);
 
   try {
-    return subscribe(*stub, event);
+    if (mode == "subscribe") {
+      return subscribe(*stub, event);
+    }
+
+    if (mode == "publish") {
+      if (argc < 4) {
+        std::cerr << "Publish requires a message payload\n";
+        return 1;
+      }
+      return publish(*stub, event, argv[3]);
+    }
+
+    std::cerr << "Unknown mode: " << mode << " (use publish or subscribe)\n";
+    return 1;
 
   } catch (const std::exception &ex) {
     std::cerr << "Error: " << ex.what() << "\n";
