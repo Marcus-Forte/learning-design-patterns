@@ -16,9 +16,8 @@ EventBusServiceImpl::Subscribe(::grpc::ServerContext *context,
 
   // Implement your subscribe logic here
 
-  Subscriber sub(bus_);
   EventType event = static_cast<EventType>(request->event());
-  sub.subscribe(event, [&writer](const Message &msg) {
+  auto sub = bus_.subscribe(event, [&writer](const Message &msg) {
     eb::Message grpc_msg;
 
     grpc_msg.set_content(msg.payload);
@@ -29,7 +28,8 @@ EventBusServiceImpl::Subscribe(::grpc::ServerContext *context,
   while (!context->IsCancelled()) {
   }
 
-  sub.unsubscribe(event);
+  bus_.unsubscribe(sub);
+
   return ::grpc::Status::OK;
 }
 

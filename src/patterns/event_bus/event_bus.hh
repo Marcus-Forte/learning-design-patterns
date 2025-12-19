@@ -1,54 +1,70 @@
 #pragma once
 
-#include "ievent_bus.hh"
+#include <functional>
+#include <memory>
+#include <string>
+#include <unordered_map>
 #include <unordered_set>
+
+struct Message {
+  std::string payload;
+};
+
+enum class EventType { EVENT_TYPE_A = 0, EVENT_TYPE_B = 1, EVENT_TYPE_C = 2 };
+using Callback = std::function<void(const Message &)>;
 
 class EventBus {
 public:
+  struct Subscriber; // Forward declaration
+
   void publish(EventType type, const Message &msg) {
     for (const auto &sub : subscribers_[type]) {
-      sub->notify(msg);
+      sub->callback(msg);
     }
   };
 
-  unsigned int get_number_of_subscribers() const {
-    unsigned int total = 0;
+  std::shared_ptr<Subscriber> subscribe(EventType type, Callback cb) {
+
+    auto sub =
+        std::make_shared<Subscriber>(next_id_++, type, std::move(cb), this);
+    subscribers_[type].insert(sub);
+    return sub;
+  };
+
+  void unsubscribe(std::shared_ptr<Subscriber> sub) {
+    subscribers_[sub->type].erase(sub);
+  };
+
+  size_t get_number_of_subscribers() const {
+    size_t count = 0;
     for (const auto &pair : subscribers_) {
-      total += pair.second.size();
+      count += pair.second.size();
     }
-    return total;
+    return count;
   };
 
 private:
-  std::unordered_map<EventType, std::unordered_set<ISubscriber *>> subscribers_;
+  std::unordered_map<EventType, std::unordered_set<std::shared_ptr<Subscriber>>>
+      subscribers_;
+  size_t next_id_ = 0;
 
-  void add_subscriber(EventType type, ISubscriber *cb) {
-    subscribers_[type].insert(cb);
-  };
-
-  void remove_subscriber(EventType type, ISubscriber *cb) {
-    subscribers_[type].erase(cb);
-  };
-
-  friend class Subscriber; // Subs can call add_subscriber / remove_subscriber.
-};
-
-// Concrete implementations
-
-class Subscriber : public ISubscriber {
 public:
-  Subscriber(EventBus &bus) : bus_(bus) {};
+  struct Subscriber {
+    size_t id;
+    EventType type;
+    Callback callback;
 
-  void subscribe(EventType type, Callback cb) {
-    bus_.add_subscriber(type, this);
-    cb_ = std::move(cb);
+    Subscriber(size_t sub_id, EventType sub_type, Callback cb, EventBus *bus)
+        : id(sub_id), type(sub_type), callback(std::move(cb)), bus_(bus) {}
+
+    /// \todo Implement RAII unsubscription
+
+    ~Subscriber() {
+      if (bus_) {
+      }
+    }
+
+  private:
+    EventBus *bus_;
   };
-
-  void unsubscribe(EventType type) { bus_.remove_subscriber(type, this); };
-
-  void notify(const Message &msg) { cb_(msg); }
-
-private:
-  EventBus &bus_;
-  Callback cb_;
 };
